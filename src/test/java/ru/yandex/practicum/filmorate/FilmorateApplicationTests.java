@@ -9,7 +9,6 @@ import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
 
-import java.time.Duration;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,7 +26,7 @@ class FilmorateApplicationTests {
         film = new Film();
         film.setName("Грозовой перевал");
         film.setDescription("Экранизация по виденью режиссера");
-        film.setDuration(Duration.ofMinutes(120));
+        film.setDuration(120);
         film.setReleaseDate(LocalDate.of(2026, 2, 16));
         userController = new UserController();
         user = new User();
@@ -194,7 +193,7 @@ class FilmorateApplicationTests {
 
     @Test
     void shouldThrowExceptionWhenDurationIsZero() {
-        film.setDuration(Duration.ZERO);
+        film.setDuration(0);
 
         ValidationException exception = assertThrows(ValidationException.class,
                 () -> filmController.create(film));
@@ -203,7 +202,7 @@ class FilmorateApplicationTests {
 
     @Test
     void shouldThrowExceptionWhenDurationIsNegative() {
-        film.setDuration(Duration.ofMinutes(-10));
+        film.setDuration(-10);
 
         ValidationException exception = assertThrows(ValidationException.class,
                 () -> filmController.create(film));
