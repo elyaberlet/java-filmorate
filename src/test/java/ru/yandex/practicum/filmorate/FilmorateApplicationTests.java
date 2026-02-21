@@ -46,12 +46,12 @@ class FilmorateApplicationTests {
         assertNotNull(created.getId());
         assertEquals(user.getId(), created.getId());
         assertEquals(user.getName(), created.getName());
-       assertEquals(user.getLogin(), created.getLogin());
-       assertEquals(user.getBirthday(), created.getBirthday());
+        assertEquals(user.getLogin(), created.getLogin());
+        assertEquals(user.getBirthday(), created.getBirthday());
     }
 
     @Test
-    void ShouldCreateUserWhenNameIsNull() {
+    void shouldCreateUserWhenNameIsNull() {
         user.setName(null);
         User created = userController.create(user);
         assertNotNull(created.getId());
@@ -144,7 +144,7 @@ class FilmorateApplicationTests {
     }
 
     @Test
-    void create_ShouldThrowException_WhenNameIsBlank() {
+    void create_ShouldThrowExceptionWhenNameIsBlank() {
         film.setName(" ");
 
         ValidationException exception = assertThrows(ValidationException.class,
@@ -153,7 +153,7 @@ class FilmorateApplicationTests {
     }
 
     @Test
-    void create_ShouldThrowException_WhenNameIsEmpty() {
+    void create_ShouldThrowExceptionWhenNameIsEmpty() {
         film.setName("");
 
         ValidationException exception = assertThrows(ValidationException.class,
@@ -211,9 +211,8 @@ class FilmorateApplicationTests {
     }
 
     // PUT
-
     @Test
-            void shouldUpdateUserIfValid() {
+    void shouldUpdateUserIfValid() {
         User createdUser = userController.create(user);
 
         User updatedUser = new User();
@@ -232,7 +231,7 @@ class FilmorateApplicationTests {
     }
 
     @Test
-            void shouldThrowExceptionWhenUpdateWithNullId() {
+    void shouldThrowExceptionWhenUpdateWithNullId() {
         User userWithNullId = new User();
         userWithNullId.setEmail("test@test.com");
         userWithNullId.setLogin("testlogin");
@@ -253,7 +252,7 @@ class FilmorateApplicationTests {
     }
 
     @Test
-    void updateWithBlankNameShouldSetNameToLogin () {
+    void updateWithBlankNameShouldSetNameToLogin() {
         user.setName(null);
         User created = userController.create(user);
         assertEquals(user.getLogin(), created.getName());
@@ -267,7 +266,6 @@ class FilmorateApplicationTests {
         assertEquals("ID не может быть null", exception.getMessage());
     }
 
-
     @Test
     void shouldReturnExceptionWhenFilmNotFound() {
         film.setId(777L);
@@ -276,7 +274,6 @@ class FilmorateApplicationTests {
                 () -> filmController.update(film));
         assertEquals("Фильм с id 777 не найден", exception.getMessage());
     }
-
 }
 
 
