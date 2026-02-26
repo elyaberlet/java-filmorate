@@ -37,12 +37,12 @@ public class FilmController {
         log.info("Обновление фильма с id: {}", film.getId());
 
         if (film.getId() == null) {
-            log.warn("Попытка обновления без указания ID");
+            log.error("Попытка обновления без указания ID");
             throw new ValidationException("ID не может быть null");
         }
 
         if (!films.containsKey(film.getId())) {
-            log.warn("Попытка обновления несуществующего фильма с id: {}", film.getId());
+            log.error("Попытка обновления несуществующего фильма с id: {}", film.getId());
             throw new ValidationException("Фильм с id " + film.getId() + " не найден");
         }
 

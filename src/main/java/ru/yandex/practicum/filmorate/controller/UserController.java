@@ -37,12 +37,12 @@ public class UserController {
         log.info("Обновление пользователя с id: {}", user.getId());
 
         if (user.getId() == null) {
-            log.warn("Попытка обновления без указания ID");
+            log.error("Попытка обновления без указания ID");
             throw new ValidationException("ID не может быть null");
         }
 
         if (!users.containsKey(user.getId())) {
-            log.warn("Попытка обновления несуществующего пользователя с id: {}", user.getId());
+            log.error("Попытка обновления несуществующего пользователя с id: {}", user.getId());
             throw new ValidationException("Пользователь с id " + user.getId() + " не найден");
         }
 
