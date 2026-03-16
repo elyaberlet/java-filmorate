@@ -1,7 +1,9 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -31,5 +33,12 @@ public class ErrorHandler {
     public ErrorResponse handleThrowable(Throwable e) {
         log.error("Внутренняя ошибка сервера: {}", e.getMessage(), e);
         return new ErrorResponse("Внутренняя ошибка сервера", "Произошла непредвиденная ошибка");
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        log.error("Ошибка валидации @Valid: {}", e.getMessage());
+        return new ErrorResponse("Ошибка валидации", e.getBindingResult().getAllErrors().get(0).getDefaultMessage());
     }
 }

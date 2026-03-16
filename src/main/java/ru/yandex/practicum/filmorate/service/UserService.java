@@ -40,9 +40,8 @@ public class UserService {
     }
 
     public void addFriend(Long userId, Long friendId) {
-        if (userId.equals(friendId)) {
-            throw new SelfFriendshipNotAllowed("Нельзя добавить самого себя в друзья");
-        }
+        validateNotSameUser(userId, friendId, "добавить самого себя в друзья");
+
         User user = userStorage.findUserById(userId);
         User friend = userStorage.findUserById(friendId);
 

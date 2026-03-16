@@ -30,6 +30,13 @@ public class InMemoryUserStorage implements UserStorage {
             log.error("Пользователь с id {} не найден в хранилище", user.getId());
             throw new NotFoundException("Пользователь с id " + user.getId() + " не найден");
         }
+
+        User existingUser = users.get(user.getId());
+
+        if (user.getFriends() == null || user.getFriends().isEmpty()) {
+            user.setFriends(existingUser.getFriends());
+        }
+
         users.put(user.getId(), user);
         log.debug("Пользователь с id {} обновлен в хранилище", user.getId());
         return user;

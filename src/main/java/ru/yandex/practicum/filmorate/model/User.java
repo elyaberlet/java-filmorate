@@ -9,8 +9,6 @@ import java.util.Set;
 @Data
 public class User {
 
-    @NotNull(message = "ID пользователя не может быть null")
-    @Positive(message = "ID пользователя должен быть положительным числом")
     private Long id;
 
     @NotBlank(message = "Email не может быть пустым")
