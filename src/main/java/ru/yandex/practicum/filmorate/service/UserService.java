@@ -1,7 +1,10 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.exception.SelfFriendshipNotAllowed;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class UserService {
     private final UserStorage userStorage;
@@ -37,7 +41,7 @@ public class UserService {
 
     public void addFriend(Long userId, Long friendId) {
         if (userId.equals(friendId)) {
-            throw new IllegalArgumentException("Нельзя добавить самого себя в друзья");
+            throw new SelfFriendshipNotAllowed("Нельзя добавить самого себя в друзья");
         }
         User user = userStorage.findUserById(userId);
         User friend = userStorage.findUserById(friendId);
@@ -67,12 +71,26 @@ public class UserService {
 
     public void deleteFriend(Long userId, Long friendId) {
         if (userId.equals(friendId)) {
-            throw new IllegalArgumentException("Нельзя добавить самого себя в друзья");
+            throw new SelfFriendshipNotAllowed("Нельзя добавить самого себя в друзья");
         }
         User user = userStorage.findUserById(userId);
         User friend = userStorage.findUserById(friendId);
 
         user.getFriends().remove(friendId);
         friend.getFriends().remove(userId);
+    }
+
+    public void setNameIfBlank(User user) {
+        if (user.getName() == null || user.getName().isBlank()) {
+            log.debug("Имя пользователя не указано, будет использован логин: {}", user.getLogin());
+            user.setName(user.getLogin());
+        }
+    }
+
+    public void validateNotSameUser(Long id, Long otherId, String errorMessage) {
+        if (id.equals(otherId)) {
+            log.error("Ошибка: пользователь пытается {}", errorMessage);
+            throw new ValidationException("Нельзя " + errorMessage);
+        }
     }
 }
