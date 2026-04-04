@@ -1,95 +1,107 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
 
-import java.time.LocalDate;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @Slf4j
 @RestController
+@Validated
 @RequestMapping("/users")
 public class UserController {
-    private final Map<Long, User> users = new HashMap<>();
+
+    private final UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
 
     @GetMapping
     public Collection<User> findAllUsers() {
-        return users.values();
+        log.info("Запрос списка всех пользователей");
+        return userService.getAllUsers();
+    }
+
+    @GetMapping("/{id}")
+    public User getUserById(@PathVariable @Positive(message = "ID пользователя должен быть положительным числом") Long id) {
+        log.info("Получение пользователя по id: {}", id);
+        return userService.findUserById(id);
+    }
+
+    @GetMapping("/{id}/friends")
+    public List<User> getUserFriends(@PathVariable @Positive(message = "ID пользователя должен быть положительным числом") Long id) {
+        log.info("Запрос списка друзей пользователя id={}", id);
+        return userService.getFriends(id);
+    }
+
+    @GetMapping("/{id}/friends/common/{otherId}")
+    public List<User> getCommonFriends(
+            @PathVariable @Positive(message = "ID пользователя должен быть положительным числом") Long id,
+            @PathVariable @Positive(message = "ID другого пользователя должен быть положительным числом") Long otherId) {
+
+        log.info("Поиск общих друзей между пользователями id={} и id={}", id, otherId);
+
+        if (id.equals(otherId)) {
+            log.error("Ошибка: попытка найти общих друзей с самим собой");
+            throw new ValidationException("Нельзя искать общих друзей с самим собой");
+        }
+
+        return userService.getCommonFriends(id, otherId);
     }
 
     @PostMapping
-    public User create(@RequestBody User user) {
-        log.info("Создание пользователя с логином: {}", user.getLogin());
-        validateUser(user);
-        setNameIfBlank(user);
-        user.setId(getNextId());
-        users.put(user.getId(), user);
-        log.info("Пользователь успешно создан с id: {}", user.getId());
-        return user;
+    public User create(@Valid @RequestBody User user) {
+        log.info("Создание нового пользователя с email: {}, логин: {}", user.getEmail(), user.getLogin());
+
+        userService.setNameIfBlank(user);
+
+        return userService.createUser(user);
     }
 
     @PutMapping
-    public User update(@RequestBody User user) {
-        log.info("Обновление пользователя с id: {}", user.getId());
+    public User update(@Valid @RequestBody User user) {
+        log.info("Обновление пользователя id={}: email={}, логин={}",
+                user.getId(), user.getEmail(), user.getLogin());
 
         if (user.getId() == null) {
-            log.error("Попытка обновления без указания ID");
-            throw new ValidationException("ID не может быть null");
+            log.error("Ошибка валидации: ID пользователя отсутствует при обновлении");
+            throw new ValidationException("ID пользователя не может быть null при обновлении");
         }
 
-        if (!users.containsKey(user.getId())) {
-            log.error("Попытка обновления несуществующего пользователя с id: {}", user.getId());
-            throw new ValidationException("Пользователь с id " + user.getId() + " не найден");
-        }
+        userService.setNameIfBlank(user);
 
-        validateUser(user);
-        setNameIfBlank(user);
-        users.put(user.getId(), user);
-        log.info("Пользователь успешно обновлен с id: {}", user.getId());
-        return user;
+        return userService.updateUser(user);
     }
 
-    private void setNameIfBlank(User user) {
-        if (user.getName() == null || user.getName().isBlank()) {
-            log.debug("Имя не указано, используется логин: {}", user.getLogin());
-            user.setName(user.getLogin());
-        }
+    @PutMapping("/{id}/friends/{friendId}")
+    public void addFriendById(
+            @PathVariable @Positive(message = "ID пользователя должен быть положительным числом") Long id,
+            @PathVariable @Positive(message = "ID друга должен быть положительным числом") Long friendId) {
+
+        log.info("Добавление друга: пользователь {} добавляет в друзья {}", id, friendId);
+
+        userService.validateNotSameUser(id, friendId, "добавить самого себя в друзья");
+
+        userService.addFriend(id, friendId);
     }
 
-    private void validateUser(User user) {
-        if (user.getEmail() == null || user.getEmail().isBlank()) {
-            log.error("Ошибка валидации: email пользователя пустой");
-            throw new ValidationException("Email не может быть пустым");
-        }
-        if (!user.getEmail().contains("@")) {
-            log.error("Ошибка валидации: email не содержит @: {}", user.getEmail());
-            throw new ValidationException("Email должен содержать @");
-        }
-        if (user.getLogin() == null || user.getLogin().isBlank()) {
-            log.error("Ошибка валидации: логин пользователя пустой");
-            throw new ValidationException("Логин не может быть пустым");
-        }
-        if (user.getLogin().contains(" ")) {
-            log.error("Ошибка валидации: логин содержит пробелы: {}", user.getLogin());
-            throw new ValidationException("Логин не может содержать пробелы");
-        }
-        if (user.getBirthday() == null || user.getBirthday().isAfter(LocalDate.now())) {
-            log.error("Ошибка валидации: некорректная дата рождения: {}", user.getBirthday());
-            throw new ValidationException("Дата рождения не может быть в будущем");
-        }
-        log.debug("Валидация пользователя пройдена успешно");
-    }
+    @DeleteMapping("/{id}/friends/{friendId}")
+    public void deleteFriend(
+            @PathVariable @Positive(message = "ID пользователя должен быть положительным числом") Long id,
+            @PathVariable @Positive(message = "ID друга должен быть положительным числом") Long friendId) {
 
-    private long getNextId() {
-        long currentMaxId = users.keySet()
-                .stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
-        return ++currentMaxId;
+        log.info("Удаление из друзей: пользователь {} удаляет из друзей {}", id, friendId);
+
+        userService.validateNotSameUser(id, friendId, "удалить самого себя из друзей");
+
+        userService.deleteFriend(id, friendId);
     }
 }
