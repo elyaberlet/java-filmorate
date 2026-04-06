@@ -58,6 +58,7 @@ public class FriendshipDbStorage extends BaseDbStorage<User> {
     public List<User> getCommonFriends(long userId, long otherId) {
         return findMany(GET_COMMON_FRIENDS_SQL, userId, otherId);
     }
+
     public String getFriendshipStatus(long userId, long friendId) {
         List<String> result = jdbc.query(
                 CHECK_FRIENDSHIP_SQL,
