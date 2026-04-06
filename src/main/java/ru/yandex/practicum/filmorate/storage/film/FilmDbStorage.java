@@ -1,167 +1,164 @@
 package ru.yandex.practicum.filmorate.storage.film;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import ru.yandex.practicum.filmorate.mappers.FilmRowMapper;
 import ru.yandex.practicum.filmorate.mappers.GenreRowMapper;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.storage.BaseDbStorage;
 
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.*;
 
 @Repository
-@RequiredArgsConstructor
-public class FilmDbStorage {
+public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
     private final JdbcTemplate jdbc;
-    private final FilmRowMapper filmRowMapper;
-    private final GenreRowMapper genreRowMapper;
+    private final GenreRowMapper genreMapper;
 
-    private static final String INSERT_FILM_SQL =
+    public FilmDbStorage(JdbcTemplate jdbc, FilmRowMapper mapper, GenreRowMapper genreMapper) {
+        super(jdbc, mapper);
+        this.jdbc = jdbc;
+        this.genreMapper = genreMapper;
+    }
+
+    private static final String INSERT_FILM =
             "INSERT INTO film (name, description, release_date, duration, mpa_id) " +
                     "VALUES (?, ?, ?, ?, ?)";
 
-    private static final String UPDATE_FILM_SQL =
+    private static final String UPDATE_FILM =
             "UPDATE film SET name = ?, description = ?, release_date = ?, duration = ?, mpa_id = ? " +
                     "WHERE film_id = ?";
 
-    private static final String GET_FILM_SQL =
-            "SELECT f.*, m.mpa_name " +
+    private static final String SELECT_ALL =
+            "SELECT f.*, m.mpa_name, COUNT(fl.user_id) AS likes " +
                     "FROM film f " +
+                    "LEFT JOIN film_like fl ON f.film_id = fl.film_id " +
                     "JOIN mpa m ON f.mpa_id = m.mpa_id " +
-                    "WHERE f.film_id = ?";
+                    "GROUP BY f.film_id, m.mpa_name";
 
-    private static final String GET_ALL_FILMS_SQL =
-            "SELECT f.*, m.mpa_name " +
+    private static final String SELECT_BY_ID =
+            "SELECT f.*, m.mpa_name, COUNT(fl.user_id) AS likes " +
                     "FROM film f " +
-                    "JOIN mpa m ON f.mpa_id = m.mpa_id";
+                    "LEFT JOIN film_like fl ON f.film_id = fl.film_id " +
+                    "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                    "WHERE f.film_id = ? " +
+                    "GROUP BY f.film_id, m.mpa_name";
 
-    private static final String GET_GENRES_BY_FILM_SQL =
+    private static final String SELECT_GENRES =
             "SELECT g.genre_id, g.genre_name " +
                     "FROM film_genre fg " +
                     "JOIN genre g ON fg.genre_id = g.genre_id " +
                     "WHERE fg.film_id = ? " +
                     "ORDER BY g.genre_id";
 
-    private static final String INSERT_FILM_GENRE_SQL =
+    private static final String INSERT_GENRE =
             "INSERT INTO film_genre (film_id, genre_id) VALUES (?, ?)";
 
-    private static final String DELETE_FILM_GENRES_SQL =
+    private static final String DELETE_GENRES =
             "DELETE FROM film_genre WHERE film_id = ?";
 
-    private static final String COUNT_LIKES_SQL =
-            "SELECT COUNT(user_id) FROM film_like WHERE film_id = ?";
+    private static final String DELETE_FILM =
+            "DELETE FROM film WHERE film_id = ?";
 
-    public Film create(Film film) {
+    private static final String ADD_LIKE =
+            "INSERT INTO film_like (film_id, user_id) VALUES (?, ?)";
 
-        KeyHolder keyHolder = new GeneratedKeyHolder();
+    private static final String REMOVE_LIKE =
+            "DELETE FROM film_like WHERE film_id = ? AND user_id = ?";
 
-        jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(
-                    INSERT_FILM_SQL, new String[]{"film_id"});
-            ps.setString(1, film.getName());
-            ps.setString(2, film.getDescription());
-            ps.setDate(3, Date.valueOf(film.getReleaseDate()));
-            ps.setInt(4, film.getDuration());
-            ps.setInt(5, film.getMpa().getId());
-            return ps;
-        }, keyHolder);
+    private static final String GET_POPULAR =
+            "SELECT f.*, m.mpa_name, COUNT(fl.user_id) AS likes " +
+                    "FROM film f " +
+                    "LEFT JOIN film_like fl ON f.film_id = fl.film_id " +
+                    "JOIN mpa m ON f.mpa_id = m.mpa_id " +
+                    "GROUP BY f.film_id, m.mpa_name " +
+                    "ORDER BY likes DESC " +
+                    "LIMIT ?";
 
-        long filmId = keyHolder.getKey().longValue();
-        film.setId(filmId);
-
-        saveGenres(film);
-
-        return getFilmById(filmId);
-    }
-
-    public Film update(Film film) {
-
-        jdbc.update(UPDATE_FILM_SQL,
+    @Override
+    public Film createFilm(Film film) {
+        long id = insert(
+                INSERT_FILM,
                 film.getName(),
                 film.getDescription(),
-                Date.valueOf(film.getReleaseDate()),
+                film.getReleaseDate(),
+                film.getDuration(),
+                film.getMpa().getId()
+        );
+
+        saveGenres(id, film);
+
+        Film created = findFilmById(id).orElseThrow();
+        created.setGenres(loadGenres(id));
+        return created;
+    }
+
+    @Override
+    public Film updateFilm(Film film) {
+        update(
+                UPDATE_FILM,
+                film.getName(),
+                film.getDescription(),
+                film.getReleaseDate(),
                 film.getDuration(),
                 film.getMpa().getId(),
                 film.getId()
         );
 
-        jdbc.update(DELETE_FILM_GENRES_SQL, film.getId());
-        saveGenres(film);
+        jdbc.update(DELETE_GENRES, film.getId());
+        saveGenres(film.getId(), film);
 
-        return getFilmById(film.getId());
+        Film updated = findFilmById(film.getId()).orElseThrow();
+        updated.setGenres(loadGenres(film.getId()));
+        return updated;
     }
 
-    public Film getFilmById(long id) {
-        Film film = jdbc.queryForObject(GET_FILM_SQL, filmRowMapper, id);
+    private void saveGenres(long filmId, Film film) {
+        if (film.getGenres() == null) return;
 
-        List<Genre> genres = jdbc.query(GET_GENRES_BY_FILM_SQL, genreRowMapper, id);
-        film.setGenres(new LinkedHashSet<>(genres));
+        film.getGenres().stream()
+                .distinct()
+                .forEach(g -> jdbc.update(INSERT_GENRE, filmId, g.getId()));
+    }
 
-        film.setLikes(getLikes(id));
+    private Set<Genre> loadGenres(long filmId) {
+        return new LinkedHashSet<>(jdbc.query(SELECT_GENRES, genreMapper, filmId));
+    }
 
+    @Override
+    public Collection<Film> findAllFilms() {
+        List<Film> films = findMany(SELECT_ALL);
+        films.forEach(f -> f.setGenres(loadGenres(f.getId())));
+        return films;
+    }
+
+    @Override
+    public Optional<Film> findFilmById(Long id) {
+        Optional<Film> film = findOne(SELECT_BY_ID, id);
+        film.ifPresent(f -> f.setGenres(loadGenres(id)));
         return film;
     }
 
-    public List<Film> getAll() {
-        List<Film> films = jdbc.query(GET_ALL_FILMS_SQL, filmRowMapper);
-
-        for (Film film : films) {
-            List<Genre> genres = jdbc.query(GET_GENRES_BY_FILM_SQL, genreRowMapper, film.getId());
-            film.setGenres(new LinkedHashSet<>(genres));
-
-            film.setLikes(getLikes(film.getId()));
-        }
-
-        return films;
+    @Override
+    public boolean deleteFilm(long id) {
+        return delete(DELETE_FILM, id);
     }
 
-    private void saveGenres(Film film) {
-        if (film.getGenres() == null) return;
-
-        for (Genre genre : film.getGenres()) {
-            jdbc.update(INSERT_FILM_GENRE_SQL, film.getId(), genre.getId());
-        }
-    }
-
-    private int getLikes(long filmId) {
-        return jdbc.queryForObject(COUNT_LIKES_SQL, Integer.class, filmId);
-    }
-
-    public void addLike(long filmId, long userId) {
-        String sql = "INSERT INTO film_like (film_id, user_id) VALUES (?, ?)";
-        jdbc.update(sql, filmId, userId);
-    }
-
-    public void removeLike(long filmId, long userId) {
-        String sql = "DELETE FROM film_like WHERE film_id = ? AND user_id = ?";
-        jdbc.update(sql, filmId, userId);
-    }
-
+    @Override
     public List<Film> getPopular(int count) {
-        String sql =
-                "SELECT f.*, m.mpa_name " +
-                        "FROM film f " +
-                        "JOIN mpa m ON f.mpa_id = m.mpa_id " +
-                        "LEFT JOIN film_like fl ON f.film_id = fl.film_id " +
-                        "GROUP BY f.film_id, m.mpa_name " +
-                        "ORDER BY COUNT(fl.user_id) DESC " +
-                        "LIMIT ?";
-
-        List<Film> films = jdbc.query(sql, filmRowMapper, count);
-
-        for (Film film : films) {
-            List<Genre> genres = jdbc.query(GET_GENRES_BY_FILM_SQL, genreRowMapper, film.getId());
-            film.setGenres(new LinkedHashSet<>(genres));
-
-            film.setLikes(getLikes(film.getId()));
-        }
+        List<Film> films = findMany(GET_POPULAR, count);
+        films.forEach(f -> f.setGenres(loadGenres(f.getId())));
         return films;
+    }
+
+    @Override
+    public void addLike(long filmId, long userId) {
+        jdbc.update(ADD_LIKE, filmId, userId);
+    }
+
+    @Override
+    public void removeLike(long filmId, long userId) {
+        jdbc.update(REMOVE_LIKE, filmId, userId);
     }
 }

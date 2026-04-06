@@ -24,16 +24,19 @@ public class FriendshipService {
         validateUsersExist(userId, friendId);
 
         friendshipStorage.addFriend(userId, friendId);
-        log.info("Пользователь {} добавил в друзья {}", userId, friendId);
+        log.info("Пользователь {} отправил запрос в друзья {}", userId, friendId);
     }
 
     public void deleteFriend(Long userId, Long friendId) {
         validateNotSameUser(userId, friendId);
         validateUsersExist(userId, friendId);
 
-        Integer status = friendshipStorage.getFriendshipStatus(userId, friendId);
+        String status = friendshipStorage.getFriendshipStatus(userId, friendId);
 
-        if (status == null) return;
+        if (status == null) {
+            log.info("Пользователь {} пытался удалить несуществующую дружбу с {}", userId, friendId);
+            return;
+        }
 
         friendshipStorage.removeFriend(userId, friendId);
         log.info("Пользователь {} удалил из друзей {}", userId, friendId);
@@ -51,20 +54,20 @@ public class FriendshipService {
         return friendshipStorage.getCommonFriends(userId, otherId);
     }
 
-    private void validateNotSameUser(Long id, Long otherId) {
-        if (id.equals(otherId)) {
+    private void validateNotSameUser(Long userId, Long otherUserId) {
+        if (userId.equals(otherUserId)) {
             throw new ValidationException("Нельзя выполнять операцию с самим собой");
         }
     }
 
-    private void validateUserExists(Long id) {
-        userStorage.findUserById(id)
+    private void validateUserExists(Long userId) {
+        userStorage.findUserById(userId)
                 .orElseThrow(() ->
-                        new NotFoundException("Пользователь с id=" + id + " не найден"));
+                        new NotFoundException("Пользователь с id=" + userId + " не найден"));
     }
 
-    private void validateUsersExist(Long id1, Long id2) {
-        validateUserExists(id1);
-        validateUserExists(id2);
+    private void validateUsersExist(Long firstUserId, Long secondUserId) {
+        validateUserExists(firstUserId);
+        validateUserExists(secondUserId);
     }
 }

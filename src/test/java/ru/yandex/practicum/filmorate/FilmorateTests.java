@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate;
 
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,11 +19,13 @@ import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 @JdbcTest
 @AutoConfigureTestDatabase
 class FilmorateTests {
@@ -30,7 +33,7 @@ class FilmorateTests {
     @Autowired
     private JdbcTemplate jdbc;
 
-    private final FilmRowMapper filmRowMapper = new FilmRowMapper(new MpaRowMapper());
+    private final FilmRowMapper filmRowMapper = new FilmRowMapper();
     private final GenreRowMapper genreRowMapper = new GenreRowMapper();
     private final UserRowMapper userRowMapper = new UserRowMapper();
     private final MpaRowMapper mpaRowMapper = new MpaRowMapper();
@@ -63,14 +66,13 @@ class FilmorateTests {
 
         userId = user.getId();
 
-        film = filmStorage.create(Film.builder()
+        film = filmStorage.createFilm(Film.builder()
                 .name("Test Film")
                 .description("Desc")
                 .releaseDate(LocalDate.of(2000, 1, 1))
                 .duration(120)
                 .mpa(new Mpa(1, "G"))
                 .build());
-
     }
 
     @Test
@@ -81,20 +83,20 @@ class FilmorateTests {
 
     @Test
     void testGetFilmById() {
-        Film found = filmStorage.getFilmById(film.getId());
+        Film found = filmStorage.findFilmById(film.getId()).orElseThrow();
         assertThat(found.getId()).isEqualTo(film.getId());
     }
 
     @Test
     void testUpdateFilm() {
         film.setDuration(100);
-        Film updated = filmStorage.update(film);
+        Film updated = filmStorage.updateFilm(film);
         assertThat(updated.getDuration()).isEqualTo(100);
     }
 
     @Test
     void testGetAllFilms() {
-        List<Film> films = filmStorage.getAll();
+        Collection<Film> films = filmStorage.findAllFilms();
         assertThat(films).isNotEmpty();
         assertThat(films.size()).isEqualTo(1);
     }
@@ -102,17 +104,17 @@ class FilmorateTests {
     @Test
     void testAddAndRemoveLike() {
         filmStorage.addLike(film.getId(), userId);
-        Film liked = filmStorage.getFilmById(film.getId());
+        Film liked = filmStorage.findFilmById(film.getId()).orElseThrow();
         assertThat(liked.getLikes()).isEqualTo(1);
 
         filmStorage.removeLike(film.getId(), userId);
-        Film unliked = filmStorage.getFilmById(film.getId());
+        Film unliked = filmStorage.findFilmById(film.getId()).orElseThrow();
         assertThat(unliked.getLikes()).isEqualTo(0);
     }
 
     @Test
     void testGetPopularFilms() {
-        Film second = filmStorage.create(Film.builder()
+        Film second = filmStorage.createFilm(Film.builder()
                 .name("Film2")
                 .description("D")
                 .releaseDate(LocalDate.of(2000, 1, 1))
@@ -173,9 +175,14 @@ class FilmorateTests {
                 .build());
 
         friendStorage.addFriend(user.getId(), user1.getId());
+
         List<User> friends = friendStorage.getFriends(user.getId());
-        assertThat(friends).hasSize(1);
-        assertThat(friends.getFirst().getId()).isEqualTo(user1.getId());
+        assertThat(friends)
+                .as("Список друзей пользователя должен содержать 1 человека после добавления")
+                .hasSize(1);
+
+        assertThat(friends.get(0).getId())
+                .isEqualTo(user1.getId());
     }
 
     @Test
@@ -188,6 +195,8 @@ class FilmorateTests {
                 .build());
 
         friendStorage.addFriend(user1.getId(), user.getId());
+        friendStorage.addFriend(user.getId(), user1.getId());
+
         friendStorage.removeFriend(user1.getId(), user.getId());
 
         List<User> friends = friendStorage.getFriends(user1.getId());
@@ -203,14 +212,18 @@ class FilmorateTests {
                 .birthday(LocalDate.of(1990, 1, 1))
                 .build());
 
-       User user2 = userStorage.createUser(User.builder()
+        User user2 = userStorage.createUser(User.builder()
                 .email("u3@mail.com")
                 .login("user3")
                 .name("User3")
                 .birthday(LocalDate.of(1992, 1, 1))
                 .build());
+
         friendStorage.addFriend(user1.getId(), user2.getId());
+        friendStorage.addFriend(user2.getId(), user1.getId());
+
         friendStorage.addFriend(user.getId(), user2.getId());
+        friendStorage.addFriend(user2.getId(), user.getId());
 
         List<User> common = friendStorage.getCommonFriends(user1.getId(), user.getId());
 

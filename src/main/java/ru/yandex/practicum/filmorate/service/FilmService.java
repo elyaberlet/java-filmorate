@@ -10,7 +10,7 @@ import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.storage.GenreDbStorage;
 import ru.yandex.practicum.filmorate.storage.MpaDbStorage;
-import ru.yandex.practicum.filmorate.storage.film.FilmDbStorage;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserDbStorage;
 
 import java.time.LocalDate;
@@ -21,25 +21,36 @@ import java.util.List;
 @Slf4j
 @Service
 public class FilmService {
+
     private static final LocalDate EARLIEST_RELEASE_DATE = LocalDate.of(1895, 12, 28);
-    private final FilmDbStorage filmStorage;
+
+    private final FilmStorage filmStorage;     // <-- теперь интерфейс
     private final UserDbStorage userStorage;
     private final GenreDbStorage genreStorage;
     private final MpaDbStorage mpaStorage;
 
     public void addLike(Long filmId, Long userId) {
-        var film = filmStorage.getFilmById(filmId);
-        if (film == null) {
-            throw new NotFoundException("Фильм с id=" + filmId + " не найден");
-        }
+        filmStorage.findFilmById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id=" + filmId + " не найден"));
+
         userStorage.findUserById(userId)
                 .orElseThrow(() -> new NotFoundException("Пользователь с id=" + userId + " не найден"));
 
         filmStorage.addLike(filmId, userId);
     }
 
+    public void removeLike(Long filmId, Long userId) {
+        filmStorage.findFilmById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id=" + filmId + " не найден"));
+
+        userStorage.findUserById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id=" + userId + " не найден"));
+
+        filmStorage.removeLike(filmId, userId);
+    }
+
     public Collection<Film> findAllFilms() {
-        return filmStorage.getAll();
+        return filmStorage.findAllFilms();
     }
 
     public Film createFilm(Film film) {
@@ -59,8 +70,9 @@ public class FilmService {
                 }
             }
         }
+
         validateFilm(film);
-        return filmStorage.create(film);
+        return filmStorage.createFilm(film);
     }
 
     public Film updateFilm(Film film) {
@@ -68,27 +80,23 @@ public class FilmService {
             log.error("Ошибка: тело запроса не может быть пустым");
             throw new ValidationException("Тело запроса не может быть пустым");
         }
-        if (film.getId() <= 0) {
+        if (film.getId() == null || film.getId() <= 0) {
             log.error("Ошибка валидации: ID фильма должен быть положительным числом: {}", film.getId());
             throw new ValidationException("ID фильма должен быть положительным числом");
         }
+
         validateFilm(film);
-        return filmStorage.update(film);
+
+        return filmStorage.updateFilm(film);
     }
 
     public Film findFilmById(Long id) {
-        try {
-            return filmStorage.getFilmById(id);
-        } catch (EmptyResultDataAccessException e) {
-            throw new NotFoundException("Фильм с id=" + id + " не найден");
-        }
+        return filmStorage.findFilmById(id)
+                .orElseThrow(() -> new NotFoundException("Фильм с id=" + id + " не найден"));
     }
 
-
-    public void removeLike(Long filmId, Long userId) {
-        filmStorage.getFilmById(filmId);
-        userStorage.findUserById(userId);
-        filmStorage.removeLike(filmId, userId);
+    public boolean deleteFilm(long id) {
+        return filmStorage.deleteFilm(id);
     }
 
     public List<Film> getPopularFilms(int count) {
@@ -101,7 +109,8 @@ public class FilmService {
             throw new ValidationException("Название не может быть пустым");
         }
         if (film.getDescription() != null && film.getDescription().length() > 200) {
-            log.error("Ошибка валидации: описание фильма превышает 200 символов (длина: {})", film.getDescription().length());
+            log.error("Ошибка валидации: описание фильма превышает 200 символов (длина: {})",
+                    film.getDescription().length());
             throw new ValidationException("Описание не может быть длиннее 200 символов");
         }
         if (film.getReleaseDate() == null || film.getReleaseDate().isBefore(EARLIEST_RELEASE_DATE)) {
@@ -113,6 +122,7 @@ public class FilmService {
             log.error("Ошибка валидации: продолжительность фильма {} некорректна", film.getDuration());
             throw new ValidationException("Продолжительность должна быть положительным числом");
         }
+
         log.debug("Валидация фильма '{}' пройдена успешно", film.getName());
     }
 }

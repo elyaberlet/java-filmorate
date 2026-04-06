@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @NoArgsConstructor
@@ -21,8 +22,6 @@ public class Film {
 
     @NotBlank(message = "Название не может быть пустым")
     private String name;
-
-    private Long genreId;
 
     @Size(max = 200, message = "Описание не может быть длиннее 200 символов")
     private String description;
@@ -38,9 +37,5 @@ public class Film {
 
     private Mpa mpa;
 
-    private Set<Genre> genres;
+    private Set<Genre> genres = new LinkedHashSet<>();
 }
-
-
-
-

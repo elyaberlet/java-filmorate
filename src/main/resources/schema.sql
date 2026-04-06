@@ -1,0 +1,62 @@
+DROP TABLE IF EXISTS rating CASCADE;
+DROP TABLE IF EXISTS film_like CASCADE;
+DROP TABLE IF EXISTS film_genre CASCADE;
+DROP TABLE IF EXISTS friendship CASCADE;
+DROP TABLE IF EXISTS film CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS genre CASCADE;
+DROP TABLE IF EXISTS mpa CASCADE;
+DROP TABLE IF EXISTS status CASCADE;
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    login VARCHAR(255) UNIQUE NOT NULL,
+    birthday DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS friendship (
+    user_id BIGINT NOT NULL,
+    friend_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    PRIMARY KEY (user_id, friend_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (friend_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS genre (
+    genre_id INT AUTO_INCREMENT PRIMARY KEY,
+    genre_name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mpa (
+    mpa_id INT PRIMARY KEY,
+    mpa_name VARCHAR(20) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS film (
+    film_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description VARCHAR(200),
+    release_date DATE NOT NULL,
+    duration INT NOT NULL,
+    mpa_id INT NOT NULL,
+    FOREIGN KEY (mpa_id) REFERENCES mpa(mpa_id)
+);
+
+CREATE TABLE IF NOT EXISTS film_genre (
+    film_id BIGINT NOT NULL,
+    genre_id INT NOT NULL,
+    PRIMARY KEY (film_id, genre_id),
+    FOREIGN KEY (film_id) REFERENCES film(film_id) ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES genre(genre_id)
+);
+
+CREATE TABLE IF NOT EXISTS film_like (
+    film_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    PRIMARY KEY (film_id, user_id),
+    FOREIGN KEY (film_id) REFERENCES film(film_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
